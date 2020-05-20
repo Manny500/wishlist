@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, logging
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
+from wtforms import Form, StringField, TextAreaField, PasswordField, validators
+from passlib.hash import sha256_crypt
 import os
 
 from data import Books
@@ -21,7 +23,7 @@ db = SQLAlchemy(app)
 #Init marshmallow
 ma = Marshmallow(app) 
 
-# Book Class/Model
+# Book Class/Model ------------------------------------------
 class Book(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     isbn = db.Column(db.Integer)
@@ -44,6 +46,121 @@ class BookSchema(ma.Schema):
 book_schema = BookSchema()
 books_schema = BookSchema(many=True)
 Books = Books()
+
+# User Class/Model ------------------------------------------
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    firstName = db.Column(db.String(100))
+    lastName = db.Column(db.String(100))
+    email = db.Column(db.String(100))
+    password = db.Column(db.String(100))
+
+    #Constructor
+    def __init__(self, firstName, lastName, email, password):
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.password = password
+
+# Book schema
+class UserSchema(ma.Schema):
+    fields = ('id', 'firstName', 'lastName', 'email', 'password')
+
+# Init Schema
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
+
+# Register Form -------------------------------------------
+class RegisterForm(Form):
+    firstName = StringField('First Name', [validators.Length(min=1, max =50)])
+    lastName = StringField('Last Name', [validators.Length(min=4, max =25)])
+    email = StringField('Email', [validators.Length(min=6, max =50)])
+    password =  PasswordField('Password', [
+        validators.Length(min=6, max =50),
+        validators.DataRequired(),
+        validators.EqualTo('confirm', message='Passwords do not match')
+        ])
+    confirm = PasswordField('Confirm Password')
+
+# Form Routes ---------------------------------------
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegisterForm(request.form)
+    if request.method == 'POST' and form.validate():
+        firstName = form.firstName.data
+        lastName = form.lastName.data
+        email = form.email.data
+        password = sha256_crypt.encrypt(str(form.password.data))
+
+        #create cursor
+        new_user = User(firstName, lastName, email, password)
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash('You have registered :)', 'success')
+
+        return redirect(url_for('login'))
+
+    return render_template('register.html', form=form)
+
+# User Routes ---------------------------------------
+
+# Register a User
+@app.route('/user', methods=['POST'])
+def add_user():
+    firstName = request.json['firstName']
+    lastName = request.json['lastName']
+    email = request.json['email']
+    password = request.json['password']
+
+    new_user = User(firstName, lastName, email, password)
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    return user_schema.jsonify(new_user)
+
+# Get All Users
+@app.route('/user', methods=['GET'])
+def get_users():
+    all_users = User.query.all()
+    result = users_schema.dump(all_users)
+    return jsonify(result.data)
+
+# Get sigle user
+@app.route('/user/<id>', methods=['GET'])
+def get_user(id):
+    user = User.query.get(id)
+    return user_schema.jsonify(user)
+
+# Update a user
+@app.route('/user/<id>', methods=['PUT'])
+def update_user(id):
+    user = User.query.get(id)
+
+    firstName = request.json['fistName']
+    lastName = request.json['lastName']
+    email = request.json['email']
+    password = request.json['password']
+
+    user.firstName = firstName
+    user.lastName = lastName
+    user.email = email
+    user.password = password
+
+    db.session.commit()
+    return user_schema.jsonify(user)
+
+# Delete a user
+@app.route('/user/<id>', methods=['DELETE'])
+def delete_user(id):
+    user = User.query.get(id)
+    db.session.delete(user)
+    db.session.commit()
+    return user_schema.jsonify(user)
+
+# Book Routes ---------------------------------------
 
 # Create a Book
 @app.route('/book', methods=['POST'])
@@ -99,6 +216,8 @@ def delete_book(id):
     db.session.commit()
     return book_schema.jsonify(book)
 
+# Navigation Routes ---------------------------------------
+
 # Set index
 @app.route('/')
 def index():
@@ -123,4 +242,5 @@ def get():
 
 # Run server
 if __name__ == '__main__':
+    app.secret_key='secret123'
     app.run(debug=True)
