@@ -6,6 +6,7 @@ from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
 import requests
+from requests.exceptions import HTTPError
 import json
 
 # import db
@@ -17,58 +18,35 @@ from models import User
 from models import Book
 
 from models import user_schema
-
-# Import sample data
-from data import Books
-Books = Books()
+from models import users_schema
+from models import book_schema
+from models import books_schema
 
 # Import forms
 from forms import RegisterForm
 from forms import BookForm
 
-# Form Routes ---------------------------------------
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    form = RegisterForm(request.form)
-    if request.method == 'POST' and form.validate():
-        firstName = form.firstName.data
-        lastName = form.lastName.data
-        email = form.email.data
-        password = sha256_crypt.encrypt(str(form.password.data))
+# Constants
+API = 'http://127.0.0.1:5000'
+############################## METHODS ########################################
 
-        #create cursor
-        new_user = User(firstName, lastName, email, password)
+# Check if user has logged in (Decorator)
+def is_logged_in(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            flash('Unathorized, Please Login', 'danger')
+            return redirect(url_for('login'))
+    return wrap
 
-        db.session.add(new_user)
-        db.session.commit()
-
-        flash('You have registered :)', 'success')
-
-        return redirect(url_for('login'))
-
-    return render_template('register.html', form=form)
-
-# User Routes ---------------------------------------
-
-# Register a User
-@app.route('/user', methods=['POST'])
-def add_user():
-    firstName = request.json['firstName']
-    lastName = request.json['lastName']
-    email = request.json['email']
-    password = request.json['password']
-
-    new_user = User(firstName, lastName, email, password)
-
-    db.session.add(new_user)
-    db.session.commit()
-
-    return user_schema.jsonify(new_user)
-
+############################## API ########################################
 # User Login 
 @app.route('/check_login', methods=['POST'])
 def check_login():
 
+    # Get Login details
     email = request.json['email']
     password_candidate =request.json['password_candidate']
 
@@ -93,48 +71,23 @@ def check_login():
         payload = {'error': error, 'email': ''}
         return jsonify(payload)
 
-# User Login 
-@app.route('/login', methods=['GET','POST'])
-def login():
-    if request.method == 'POST':
-        #Get Form fields
-        email = request.form['email']
-        password_candidate = request.form['password']
-        headers = {'Content-Type' : 'application/json'}
-        payload = {'email': email, 'password_candidate': password_candidate}
-        r = requests.post('http://127.0.0.1:5000/check_login', data=json.dumps(payload),headers=headers)
+#Create new User
+@app.route('/user', methods=['POST'])
+def user():
 
-        json_string = r.json()
+    # Get User details
+    firstName = request.json['firstName']
+    lastName = request.json['lastName']
+    email = request.json['email']
+    password = request.json['password']
 
-        if(json_string['email'] != ''):
-            # Passed
-            session['logged_in'] = True
-            session['email'] = json_string['email']
-            session['firstName'] = json_string['firstName']
-
-            flash('You have successfully logged in', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            return render_template('login.html', error=json_string['error'])
-    return render_template('login.html')
-
-# Check if user has logged in (Decorator)
-def is_logged_in(f):
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        if 'logged_in' in session:
-            return f(*args, **kwargs)
-        else:
-            flash('Unathorized, Please Login', 'danger')
-            return redirect(url_for('login'))
-    return wrap
-
-# Logout
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('You have successfully logged out', 'success')
-    return redirect(url_for('login'))
+    #DB instance
+    new_user = User(firstName, lastName, email, password)
+    db.session.add(new_user)
+    db.session.commit()
+    
+    payload = {'status': 'success'}
+    return jsonify(payload)
 
 # Get All Users
 @app.route('/user', methods=['GET'])
@@ -175,62 +128,123 @@ def delete_user(id):
     db.session.commit()
     return user_schema.jsonify(user)
 
-# Book Routes ---------------------------------------
+#Book Routes ---------------------------------------
+# Create a Book
+@app.route('/book', methods=['POST'])
+def new_book():
 
-# # Create a Book
-# @app.route('/book', methods=['POST'])
-# def add_book():
+    isbn = request.json['isbn']
+    title = request.json['title']
+    author = request.json['author']
+    date = request.json['date']
 
-#     isbn = request.json['name']
-#     title = request.json['title']
-#     author = request.json['author']
-#     date = request.json['date']
+    new_book = Book(isbn, title, author, date)
 
-#     new_book = Book(isbn, title, author, date)
+    db.session.add(new_book)
+    db.session.commit()
 
-#     db.session.add(new_book)
-#     db.session.commit()
+    payload = {'status': 'success'}
+    return jsonify(payload)
 
-#     return book_schema.jsonify(new_book)
+# Get All Books
+@app.route('/book', methods=['GET'])
+def get_books():
+    all_books = Book.query.all()
+    result = books_schema.dump(all_books)
+    return jsonify(result)
 
-# # Get All Books
-# @app.route('/book', methods=['GET'])
-# def get_books():
-#     all_books = Book.query.all()
-#     result = books_schema.dump(all_books)
-#     return jsonify(result.data)
+# Get sigle book
+@app.route('/book/<id>', methods=['GET'])
+def get_book(id):
+    book = Book.query.get(id)
+    return book_schema.jsonify(book)
 
-# # Get sigle book
-# @app.route('/book/<id>', methods=['GET'])
-# def get_book(id):
-#     book = Book.query.get(id)
-#     return book_schema.jsonify(book)
+# Update a book
+@app.route('/book/<id>', methods=['PUT'])
+def update_book(id):
+    book = Book.query.get(id)
 
-# # Update a book
-# @app.route('/book/<id>', methods=['PUT'])
-# def update_book(id):
-#     book = Book.query.get(id)
+    isbn = request.json['isbn']
+    title = request.json['title']
+    author = request.json['author']
+    date = request.json['date']
 
-#     isbn = request.json['isbn']
-#     title = request.json['title']
-#     author = request.json['author']
-#     date = request.json['date']
+    book.isbn = isbn
+    book.title = title
+    book.author = author
+    book.date = date
 
-#     book.isbn = isbn
-#     book.title = title
-#     book.author = author
-#     book.date = date
+    db.session.commit()
+    return book_schema.jsonify(book)
 
-#     db.session.commit()
-#     return book_schema.jsonify(book)
+# Delete a book
+@app.route('/book/<id>', methods=['DELETE'])
+def delete_book(id):
+    book = Book.query.get(id)
+    db.session.delete(book)
+    db.session.commit()
+    return book_schema.jsonify(book)
 
-# # Delete a book
-# @app.route('/book/<id>', methods=['DELETE'])
-# def delete_book(id):
-#     book = Book.query.get(id)
-#     db.session.delete(book)
-#     db.session.commit()
-#     return book_schema.jsonify(book)
+
+############################## UI ########################################
+# Form Routes ---------------------------------------
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegisterForm(request.form)
+    if request.method == 'POST' and form.validate():
+        firstName = form.firstName.data
+        lastName = form.lastName.data
+        email = form.email.data
+        password = sha256_crypt.encrypt(str(form.password.data))
+
+        # Build Request
+        headers = {'Content-Type' : 'application/json'}
+        payload = {'firstName': firstName, 'lastName': lastName, 'email': email, 'password': password}
+        r = requests.post(API+'/user', data=json.dumps(payload),headers=headers)
+
+        json_string = r.json()
+
+        if(json_string['status'] == 'success'):
+            
+            flash('You have registered :)', 'success')
+            return redirect(url_for('login'))
+        else:
+            return render_template('register.html', error=json_string['error'])
+    return render_template('register.html', form=form)
+# User Routes ---------------------------------------
+# User Login 
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        #Get Form fields
+        email = request.form['email']
+        password_candidate = request.form['password']
+
+        # Build Request
+        headers = {'Content-Type' : 'application/json'}
+        payload = {'email': email, 'password_candidate': password_candidate}
+        r = requests.post(API+'/check_login', data=json.dumps(payload),headers=headers)
+
+        json_string = r.json()
+
+        if(json_string['email'] != ''):
+            # Passed
+            session['logged_in'] = True
+            session['email'] = json_string['email']
+            session['firstName'] = json_string['firstName']
+
+            flash('You have successfully logged in', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            return render_template('login.html', error=json_string['error'])
+    return render_template('login.html')
+
+# Logout
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have successfully logged out', 'success')
+    return redirect(url_for('login'))
 
 # Go to Add Book
 @app.route('/add_book', methods=['GET','POST'])
@@ -243,19 +257,22 @@ def add_book():
         author = form.author.data
         date = form.date.data
         
-        new_book = Book(isbn, title, author, date)
+        # Build Request
+        headers = {'Content-Type' : 'application/json'}
+        payload = {'isbn': isbn, 'title': title, 'author': author, 'date': date}
+        r = requests.post(API+'/book', data=json.dumps(payload),headers=headers)
 
-        db.session.add(new_book)
-        db.session.commit()
+        json_string = r.json()
 
-        flash('Added New Book', 'success')
-
-        return redirect(url_for('dashboard'))
-
+        if(json_string['status'] == 'success'):
+            
+            flash('You have added a new book', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            return render_template('add_book.html', error=json_string['error'])
     return render_template('add_book.html', form=form)
 
 # Navigation Routes ---------------------------------------
-
 # Set index
 @app.route('/')
 def index():
@@ -270,21 +287,86 @@ def about():
 @app.route('/list')
 @is_logged_in
 def list():
-    return render_template('list.html', books = Books)
+    response = requests.get(API+'/book') 
+
+    json_string = response.json()
+
+    if len(json_string) > 0:
+        return render_template('list.html', books=json_string)
+    else:
+        msg = 'No Book found'
+        return render_template('list.html', msg=msg)
+
+# Set list of books
+@app.route('/edit_book/<string:id>',methods=['GET','POST'])
+@is_logged_in
+def edit_book(id):
+
+    result = requests.get(API+'/book/'+id) 
+
+    json_result = result.json()
+
+    form = BookForm(request.form)
+
+    form.isbn.data = json_result['isbn']
+    form.title.data = json_result['title']
+    form.author.data = json_result['author']
+    form.date.data = json_result['date']
+    
+    if request.method == 'POST' and form.validate():
+
+        isbn = request.form['isbn']
+        title = request.form['title']
+        author = request.form['author']
+        date = request.form['date']
+
+        # Build Request
+        headers = {'Content-Type' : 'application/json'}
+        payload = {'isbn': isbn, 'title': title, 'author': author, 'date': date}
+        response = requests.put(API+'/book/'+id, data=json.dumps(payload),headers=headers) 
+
+        json_string = response.json()
+
+        if len(json_string) > 0:
+            flash('Book Updated', 'success')
+            return redirect(url_for('dashboard'))
+    return render_template('edit_book.html', form=form)
 
 # get a book detail
-@app.route('/list/<string:id>')
+@app.route('/list/<string:id>', methods=['GET'])
 @is_logged_in
 def details(id):
-    return render_template('details.html', id=id)
+    response = requests.get(API+'/book/'+id) 
 
-# Create a simple get request
-@app.route('/remove', methods=['GET'])
-def get():
-    return jsonify({'msg': 'Hello world'})
+    json_string = response.json()
+
+    if len(json_string) > 0:
+        return render_template('details.html', book=json_string)
+    else:
+        msg = 'No Book found'
+        return render_template('details.html', msg=msg)
+
+# Delete a book detail
+@app.route('/del_book/<string:id>', methods=['POST'])
+@is_logged_in
+def del_book(id):
+    response = requests.delete(API+'/book/'+id) 
+
+    json_string = response.json()
+
+    flash('Book deleted', 'success')
+    return redirect(url_for('dashboard'))
 
 # Go to Dashboard
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET'])
 @is_logged_in
 def dashboard():
-    return render_template('dashboard.html')
+    response = requests.get(API+'/book') 
+
+    json_string = response.json()
+
+    if len(json_string) > 0:
+        return render_template('dashboard.html', books=json_string)
+    else:
+        msg = 'No Book found'
+        return render_template('dashboard.html', msg=msg)

@@ -1,3 +1,4 @@
+from marshmallow import Schema, fields
 from app import db
 from app import ma
 
@@ -18,7 +19,11 @@ class Book(db.Model):
 
 # Book schema
 class BookSchema(ma.Schema):
-    fields = ('id', 'isbn', 'title', 'author', 'date')
+    id = fields.Integer()
+    isbn = fields.Integer()
+    title = fields.Str()
+    author = fields.Str()
+    date = fields.Str()
 
 # Init Schema
 book_schema = BookSchema()
@@ -41,7 +46,11 @@ class User(db.Model):
 
 # Book schema
 class UserSchema(ma.Schema):
-    fields = ('id', 'firstName', 'lastName', 'email', 'password')
+    id = fields.Integer()
+    firstName = fields.Str()
+    lastName = fields.Str()
+    email = fields.Str()
+    password = fields.Str()
 
 # Init Schema
 user_schema = UserSchema()

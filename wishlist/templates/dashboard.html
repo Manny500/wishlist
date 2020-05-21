@@ -2,6 +2,29 @@
 
 {% block body %}
     <h1> Dashboard <small> Welcome {{session.firstName}} </small></h1>
-    <a class="btn btn-sucess" href="/add_book"> Add Book</a>
+    <a class="btn btn-primary" href="/add_book"> Add Book</a>
    <hr>
+
+   <table class="table table-striped">
+       <tr>
+           <th>Title</th>
+       </tr>
+       <tr>
+            <th>ISBN</th>
+        </tr>
+       {% for book in books %}
+       <tr>
+           <td>{{book.title}}</td>
+           <td>{{book.isbn}}</td>
+           <td><a a href="edit_book/{{book.id}}" class="btn btn-primary pull-right">Edit</a></td>
+           <td>
+              <form action="{{url_for('del_book', id= book.id)}}" method="POST">
+                <input type="hidden" name="_method" value="Delete">
+                <input type="submit" value="Delete" class="btn btn-danger">
+                <input>
+              </form>
+           </td>
+       </tr>
+       {% endfor %}
+   </table>
 {% endblock%}
