@@ -276,6 +276,10 @@ def delete_book(id):
     book = Book.query.get(id)
     db.session.delete(book)
     db.session.commit()
+
+    Owner.query.filter(Owner.bookId == book.id).delete(synchronize_session=False)
+    db.session.commit()
+
     return book_schema.jsonify(book)
 
 ############################## UI ########################################
