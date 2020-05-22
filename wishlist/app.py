@@ -78,6 +78,27 @@ class UserSchema(ma.Schema):
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
 
+####### OWNER MODEL ########
+class Owner(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    userId = db.Column(db.Integer, db.ForeignKey("user.id"))
+    bookId = db.Column(db.Integer, db.ForeignKey("book.id"))
+    
+    #Constructor
+    def __init__(self, userId, bookId):
+        self.userId = userId
+        self.bookId = bookId
+
+# Book schema
+class OwnerSchema(ma.Schema):
+    id = fields.Integer()
+    userId = fields.Integer()
+    bookId = fields.Integer()
+
+# Init Schema
+owner_schema = OwnerSchema()
+owners_schema = OwnerSchema(many=True)
+
 # Import forms
 from forms import RegisterForm
 from forms import BookForm
@@ -116,7 +137,7 @@ def check_login():
         # Compare passwords
         if sha256_crypt.verify(password_candidate, password):
             app.logger.info('PASSWORD MATCHED')
-            payload = {'email': user.email, 'firstName': user.firstName}
+            payload = {'email': user.email, 'firstName': user.firstName, 'id': user.id}
             return jsonify(payload)
         else:
             app.logger.info('PASSWORD NOT MATCHED')
@@ -194,19 +215,34 @@ def new_book():
     title = request.json['title']
     author = request.json['author']
     date = request.json['date']
+    userId = request.json['userId']
 
-    new_book = Book(isbn, title, author, date)
+    old_book = Book.query.filter_by(isbn=isbn).first()
+    if(old_book == None):
 
-    db.session.add(new_book)
+        new_book = Book(isbn, title, author, date)
+
+        db.session.add(new_book)
+        db.session.commit()
+    
+    db_book = Book.query.filter_by(isbn=isbn).first()
+
+    bookId = db_book.id
+
+    new_owner = Owner(userId, bookId)
+
+    db.session.add(new_owner)
     db.session.commit()
 
     payload = {'status': 'success'}
     return jsonify(payload)
 
-# Get All Books
+# Get All Books for the user
 @app.route('/book', methods=['GET'])
 def get_books():
-    all_books = Book.query.all()
+
+    userID = request.args['id']
+    all_books = db.session.execute('SELECT * FROM book WHERE id in (SELECT bookid FROM owner WHERE userid = :val)',{'val': userID})
     result = books_schema.dump(all_books)
     return jsonify(result)
 
@@ -289,6 +325,7 @@ def login():
             session['logged_in'] = True
             session['email'] = json_string['email']
             session['firstName'] = json_string['firstName']
+            session['id'] = json_string['id']
 
             flash('You have successfully logged in', 'success')
             return redirect(url_for('dashboard'))
@@ -317,7 +354,7 @@ def add_book():
         
         # Build Request
         headers = {'Content-Type' : 'application/json'}
-        payload = {'isbn': isbn, 'title': title, 'author': author, 'date': date}
+        payload = {'isbn': isbn, 'title': title, 'author': author, 'date': date, 'userId': session['id']}
         r = requests.post(API+'/book', data=json.dumps(payload),headers=headers)
 
         json_string = r.json()
@@ -345,7 +382,10 @@ def about():
 @app.route('/list')
 @is_logged_in
 def list():
-    response = requests.get(API+'/book') 
+
+    headers = {'Content-Type' : 'application/json'}
+    payload = {'id': session['id']}
+    response = requests.get(API+'/book', params=payload, headers=headers) 
 
     json_string = json.loads(response.text)
 
@@ -419,7 +459,10 @@ def del_book(id):
 @app.route('/dashboard', methods=['GET'])
 @is_logged_in
 def dashboard():
-    response = requests.get(API+'/book') 
+
+    headers = {'Content-Type' : 'application/json'}
+    payload = {'id': session['id']}
+    response = requests.get(API+'/book', params=payload, headers=headers) 
 
     json_string = response.json()
 

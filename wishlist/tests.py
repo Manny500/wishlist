@@ -56,6 +56,46 @@ class FlaskTestCase(unittest.TestCase):
         response = tester.get('/dashboard', follow_redirects=True)
         self.assertIn(b'Unathorized, Please Login', response.data)
 
+    #Ensure that about page was set up correctly
+    def test_index(self):
+        tester = app.test_client(self)
+        tester.post(
+            '/login',
+            data=dict(email="Manny@hdsalkfjal",password="12345678"),
+            follow_redirects=True)
+        response = tester.get('/about', content_type='html/text')
+        self.assertEqual(response.status_code, 200)
+    
+    #Test about page is loading
+    def test_index_page(self):
+        tester = app.test_client(self)
+        tester.post(
+            '/login',
+            data=dict(email="Manny@hdsalkfjal",password="12345678"),
+            follow_redirects=True)
+        response = tester.get('/about', content_type='html/text')
+        self.assertTrue(b'Tired of forgetting book recommendations?' in response.data)
+    
+    #Ensure that My Books page was set up correctly
+    def test_index(self):
+        tester = app.test_client(self)
+        tester.post(
+            '/login',
+            data=dict(email="Manny@hdsalkfjal",password="12345678"),
+            follow_redirects=True)
+        response = tester.get('/list', content_type='html/text')
+        self.assertEqual(response.status_code, 200)
+    
+    #Test My Books page is loading
+    def test_index_page(self):
+        tester = app.test_client(self)
+        tester.post(
+            '/login',
+            data=dict(email="Manny@hdsalkfjal",password="12345678"),
+            follow_redirects=True)
+        response = tester.get('/list', content_type='html/text')
+        self.assertTrue(b'Books' in response.data)
+
 ############################## API TEST ########################################
     #Ensure that we can retrive all books
     def test_all_book_status(self):
@@ -131,5 +171,3 @@ class FlaskTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-    
