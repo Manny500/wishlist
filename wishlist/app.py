@@ -131,7 +131,9 @@ def check_login():
     # Query DB
     user = User.query.filter_by(email=email).first()
 
+    # If the user does exist
     if(user != None):
+
         password = user.password
 
         # Compare passwords
@@ -217,7 +219,11 @@ def new_book():
     date = request.json['date']
     userId = request.json['userId']
 
+    #Check to see if there is already that book in the db
+    #Assuming no book has the same  ISBN
     old_book = Book.query.filter_by(isbn=isbn).first()
+
+    #If there is no existing book, create one
     if(old_book == None):
 
         new_book = Book(isbn, title, author, date)
@@ -225,10 +231,11 @@ def new_book():
         db.session.add(new_book)
         db.session.commit()
     
+    #Get the id of the book in question
     db_book = Book.query.filter_by(isbn=isbn).first()
-
     bookId = db_book.id
 
+    #Mapp the new user ownership to the book
     new_owner = Owner(userId, bookId)
 
     db.session.add(new_owner)
@@ -277,6 +284,7 @@ def delete_book(id):
     db.session.delete(book)
     db.session.commit()
 
+    #Once a book is delete the ownership mapping should be delete as well
     Owner.query.filter(Owner.bookId == book.id).delete(synchronize_session=False)
     db.session.commit()
 
@@ -286,8 +294,13 @@ def delete_book(id):
 ####### FORM ROUTES ########
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    #Get form validation and details
     form = RegisterForm(request.form)
+
+    #IF form is submitted register the user
     if request.method == 'POST' and form.validate():
+
+        #Get form info
         firstName = form.firstName.data
         lastName = form.lastName.data
         email = form.email.data
@@ -296,7 +309,11 @@ def register():
         # Build Request
         headers = {'Content-Type' : 'application/json'}
         payload = {'firstName': firstName, 'lastName': lastName, 'email': email, 'password': password}
-        r = requests.post(API+'/user', data=json.dumps(payload),headers=headers)
+
+        try:
+            r = requests.post(API+'/user', data=json.dumps(payload),headers=headers)
+        except requests.exceptions.RequestException as e:  
+            raise SystemExit(e)
 
         json_string = r.json()
 
@@ -312,7 +329,9 @@ def register():
 # User Login 
 @app.route('/login', methods=['GET','POST'])
 def login():
+
     if request.method == 'POST':
+
         #Get Form fields
         email = request.form['email']
         password_candidate = request.form['password']
@@ -320,12 +339,17 @@ def login():
         # Build Request
         headers = {'Content-Type' : 'application/json'}
         payload = {'email': email, 'password_candidate': password_candidate}
-        r = requests.post(API+'/check_login', data=json.dumps(payload),headers=headers)
+
+        try:
+            r = requests.post(API+'/check_login', data=json.dumps(payload),headers=headers)
+        except requests.exceptions.RequestException as e:  
+            raise SystemExit(e)
 
         json_string = r.json()
 
         if(json_string['email'] != ''):
-            # Passed
+
+            # Passed same user info in session
             session['logged_in'] = True
             session['email'] = json_string['email']
             session['firstName'] = json_string['firstName']
@@ -349,8 +373,11 @@ def logout():
 @app.route('/add_book', methods=['GET','POST'])
 @is_logged_in
 def add_book():
+
     form = BookForm(request.form)
+
     if request.method == 'POST' and form.validate():
+
         isbn = form.isbn.data
         title = form.title.data
         author = form.author.data
@@ -359,7 +386,11 @@ def add_book():
         # Build Request
         headers = {'Content-Type' : 'application/json'}
         payload = {'isbn': isbn, 'title': title, 'author': author, 'date': date, 'userId': session['id']}
-        r = requests.post(API+'/book', data=json.dumps(payload),headers=headers)
+        
+        try:
+            r = requests.post(API+'/book', data=json.dumps(payload),headers=headers)
+        except requests.exceptions.RequestException as e:  
+            raise SystemExit(e)
 
         json_string = r.json()
 
@@ -387,9 +418,14 @@ def about():
 @is_logged_in
 def list():
 
+    #Build the request
     headers = {'Content-Type' : 'application/json'}
     payload = {'id': session['id']}
-    response = requests.get(API+'/book', params=payload, headers=headers) 
+
+    try:
+        response = requests.get(API+'/book', params=payload, headers=headers) 
+    except requests.exceptions.RequestException as e:  
+        raise SystemExit(e)
 
     json_string = json.loads(response.text)
 
@@ -404,12 +440,17 @@ def list():
 @is_logged_in
 def edit_book(id):
 
-    result = requests.get(API+'/book/'+id) 
+    #get the books info
+    try:
+        result = requests.get(API+'/book/'+id) 
+    except requests.exceptions.RequestException as e:  
+        raise SystemExit(e)
 
     json_result = result.json()
 
     form = BookForm(request.form)
 
+    #Prepopulate the form
     form.isbn.data = json_result['isbn']
     form.title.data = json_result['title']
     form.author.data = json_result['author']
@@ -425,20 +466,30 @@ def edit_book(id):
         # Build Request
         headers = {'Content-Type' : 'application/json'}
         payload = {'isbn': isbn, 'title': title, 'author': author, 'date': date}
-        response = requests.put(API+'/book/'+id, data=json.dumps(payload),headers=headers) 
+
+        try:
+            response = requests.put(API+'/book/'+id, data=json.dumps(payload),headers=headers) 
+        except requests.exceptions.RequestException as e:  
+            raise SystemExit(e)
 
         json_string = response.json()
 
         if len(json_string) > 0:
             flash('Book Updated', 'success')
             return redirect(url_for('dashboard'))
+
     return render_template('edit_book.html', form=form)
 
 # get a book detail
 @app.route('/list/<string:id>', methods=['GET'])
 @is_logged_in
 def details(id):
-    response = requests.get(API+'/book/'+id) 
+
+    #Get book details
+    try:
+        response = requests.get(API+'/book/'+id) 
+    except requests.exceptions.RequestException as e:  
+        raise SystemExit(e)
 
     json_string = response.json()
 
@@ -452,7 +503,11 @@ def details(id):
 @app.route('/del_book/<string:id>', methods=['POST'])
 @is_logged_in
 def del_book(id):
-    response = requests.delete(API+'/book/'+id) 
+
+    try:
+        response = requests.delete(API+'/book/'+id) 
+    except requests.exceptions.RequestException as e:  
+        raise SystemExit(e)
 
     json_string = response.json()
 
@@ -466,8 +521,12 @@ def dashboard():
 
     headers = {'Content-Type' : 'application/json'}
     payload = {'id': session['id']}
-    response = requests.get(API+'/book', params=payload, headers=headers) 
 
+    try:
+        response = requests.get(API+'/book', params=payload, headers=headers) 
+    except requests.exceptions.RequestException as e:  
+        raise SystemExit(e)
+    
     json_string = response.json()
 
     if len(json_string) > 0:
