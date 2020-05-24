@@ -6,13 +6,38 @@ from flask_sqlalchemy import SQLAlchemy
 from requests.exceptions import HTTPError
 from marshmallow import Schema, fields
 from passlib.hash import sha256_crypt
+from logging import FileHandler, WARNING, DEBUG
 from functools import wraps
 import requests
 import json
+import glob
+import logging.handlers
 
 ####### CONFIG ########
 # Init App
 app = Flask(__name__)
+
+ERRORLOG_FILENAME = 'error_log.log'
+LOG_FILENAME = 'log.log'
+
+
+if not app.debug:
+    # Init File handler
+    file_handler = FileHandler(ERRORLOG_FILENAME)
+    file_handler.setLevel(WARNING)
+
+    app.logger.addHandler(file_handler)
+
+
+# Set up a specific logger with our desired output level
+my_logger = logging.getLogger('MyLogger')
+my_logger.setLevel(logging.DEBUG)
+
+# Add the log message handler to the logger
+handler = logging.handlers.RotatingFileHandler(
+              LOG_FILENAME, maxBytes=2000, backupCount=5)
+
+my_logger.addHandler(handler)
 
 # LOAD config file
 app.config.from_pyfile('config.py')
@@ -124,6 +149,9 @@ def is_logged_in(f):
 @app.route('/check_login', methods=['POST'])
 def check_login():
 
+    #Logs 
+    my_logger.debug('Entering Check Login')
+
     # Get Login details
     email = request.json['email']
     password_candidate =request.json['password_candidate']
@@ -140,20 +168,25 @@ def check_login():
         if sha256_crypt.verify(password_candidate, password):
             app.logger.info('PASSWORD MATCHED')
             payload = {'email': user.email, 'firstName': user.firstName, 'id': user.id}
+            my_logger.debug('Check Login Success')
             return jsonify(payload)
         else:
             app.logger.info('PASSWORD NOT MATCHED')
             error = 'Invalid login'
             payload = {'error': error, 'email': ''}
+            my_logger.debug('Check Login unsuccessful')
             return jsonify(payload)
     else:
         error = 'User email not found'
         payload = {'error': error, 'email': ''}
+        my_logger.debug('Check Login Error')
         return jsonify(payload)
 
 # Create new User
 @app.route('/user', methods=['POST'])
 def user():
+
+    my_logger.debug('Entering get user POST')
 
     # Get User details
     firstName = request.json['firstName']
@@ -172,6 +205,8 @@ def user():
 # Get All Users
 @app.route('/user', methods=['GET'])
 def get_users():
+        
+    my_logger.debug('Entering get user GET')
     all_users = User.query.all()
     result = users_schema.dump(all_users)
     return jsonify(result.data)
@@ -179,12 +214,18 @@ def get_users():
 # Get sigle user
 @app.route('/user/<id>', methods=['GET'])
 def get_user(id):
+
+    my_logger.debug('Entering get user id GET')
+
     user = User.query.get(id)
     return user_schema.jsonify(user)
 
 # Update a user
 @app.route('/user/<id>', methods=['PUT'])
 def update_user(id):
+
+    my_logger.debug('Entering get user id PUT')
+
     user = User.query.get(id)
 
     firstName = request.json['fistName']
@@ -203,6 +244,8 @@ def update_user(id):
 # Delete a user
 @app.route('/user/<id>', methods=['DELETE'])
 def delete_user(id):
+
+    my_logger.debug('Entering get user DELETE')
     user = User.query.get(id)
     db.session.delete(user)
     db.session.commit()
@@ -213,6 +256,7 @@ def delete_user(id):
 @app.route('/book', methods=['POST'])
 def new_book():
 
+    my_logger.debug('Entering book POST')
     isbn = request.json['isbn']
     title = request.json['title']
     author = request.json['author']
@@ -248,6 +292,7 @@ def new_book():
 @app.route('/book', methods=['GET'])
 def get_books():
 
+    my_logger.debug('Entering book GET')
     userID = request.args['id']
     all_books = db.session.execute('SELECT * FROM book WHERE id in (SELECT bookid FROM owner WHERE userid = :val)',{'val': userID})
     result = books_schema.dump(all_books)
@@ -256,12 +301,16 @@ def get_books():
 # Get sigle book
 @app.route('/book/<id>', methods=['GET'])
 def get_book(id):
+
+    my_logger.debug('Entering book id POST')
     book = Book.query.get(id)
     return book_schema.jsonify(book)
 
 # Update a book
 @app.route('/book/<id>', methods=['PUT'])
 def update_book(id):
+
+    my_logger.debug('Entering book PUT')
     book = Book.query.get(id)
 
     isbn = request.json['isbn']
@@ -280,6 +329,8 @@ def update_book(id):
 # Delete a book
 @app.route('/book/<id>', methods=['DELETE'])
 def delete_book(id):
+
+    my_logger.debug('Entering book DELETE')
     book = Book.query.get(id)
     db.session.delete(book)
     db.session.commit()
@@ -294,6 +345,9 @@ def delete_book(id):
 ####### FORM ROUTES ########
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+
+    my_logger.debug('Entering register POST')
+
     #Get form validation and details
     form = RegisterForm(request.form)
 
