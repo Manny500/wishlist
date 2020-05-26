@@ -152,9 +152,16 @@ def check_login():
     #Logs 
     my_logger.debug('Entering Check Login')
 
-    # Get Login details
-    email = request.json['email']
-    password_candidate =request.json['password_candidate']
+    try:
+        # Get Login details
+        email = request.json['email']
+        password_candidate =request.json['password_candidate']
+
+    except requests.exceptions.RequestException as e:
+        error = e
+        payload = {'error': error, 'email': ''}
+        my_logger.debug('Check Login Error')
+        return jsonify(payload)
 
     # Query DB
     user = User.query.filter_by(email=email).first()
@@ -182,17 +189,25 @@ def check_login():
         my_logger.debug('Check Login Error')
         return jsonify(payload)
 
+
 # Create new User
 @app.route('/user', methods=['POST'])
 def user():
 
     my_logger.debug('Entering get user POST')
 
-    # Get User details
-    firstName = request.json['firstName']
-    lastName = request.json['lastName']
-    email = request.json['email']
-    password = request.json['password']
+    try:
+        # Get User details
+        firstName = request.json['firstName']
+        lastName = request.json['lastName']
+        email = request.json['email']
+        password = request.json['password']
+
+    except requests.exceptions.RequestException as e:
+        error = e
+        payload = {'error': error,}
+        my_logger.debug('Check Login Error')
+        return jsonify(payload)
 
     #DB instance
     new_user = User(firstName, lastName, email, password)
@@ -226,12 +241,18 @@ def update_user(id):
 
     my_logger.debug('Entering get user id PUT')
 
-    user = User.query.get(id)
+    try:
+        user = User.query.get(id)
 
-    firstName = request.json['fistName']
-    lastName = request.json['lastName']
-    email = request.json['email']
-    password = request.json['password']
+        firstName = request.json['fistName']
+        lastName = request.json['lastName']
+        email = request.json['email']
+        password = request.json['password']
+    except requests.exceptions.RequestException as e:
+        error = e
+        payload = {'error': error}
+        my_logger.debug('Check Login Error')
+        return jsonify(payload)
 
     user.firstName = firstName
     user.lastName = lastName
@@ -256,12 +277,18 @@ def delete_user(id):
 @app.route('/book', methods=['POST'])
 def new_book():
 
-    my_logger.debug('Entering book POST')
-    isbn = request.json['isbn']
-    title = request.json['title']
-    author = request.json['author']
-    date = request.json['date']
-    userId = request.json['userId']
+    try:
+        my_logger.debug('Entering book POST')
+        isbn = request.json['isbn']
+        title = request.json['title']
+        author = request.json['author']
+        date = request.json['date']
+        userId = request.json['userId']
+    except requests.exceptions.RequestException as e:
+        error = e
+        payload = {'error': error}
+        my_logger.debug('Check Login Error')
+        return jsonify(payload)
 
     #Check to see if there is already that book in the db
     #Assuming no book has the same  ISBN
@@ -313,10 +340,16 @@ def update_book(id):
     my_logger.debug('Entering book PUT')
     book = Book.query.get(id)
 
-    isbn = request.json['isbn']
-    title = request.json['title']
-    author = request.json['author']
-    date = request.json['date']
+    try:
+        isbn = request.json['isbn']
+        title = request.json['title']
+        author = request.json['author']
+        date = request.json['date']
+    except requests.exceptions.RequestException as e:
+        error = e
+        payload = {'error': error}
+        my_logger.debug('Check Login Error')
+        return jsonify(payload)
 
     book.isbn = isbn
     book.title = title
