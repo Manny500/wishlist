@@ -1,6 +1,8 @@
-from app import app
+from blue import app
 import unittest
 import json
+
+# Constants
 
 class FlaskTestCase(unittest.TestCase):
 
@@ -102,7 +104,7 @@ class FlaskTestCase(unittest.TestCase):
     def test_check_login(self):
         tester = app.test_client(self)
         response = tester.post(
-            '/check_login',
+            'user/check_login',
             data=json.dumps(dict(email="Manny@hdsalkfjal",password_candidate="12345678")),
             follow_redirects=True,content_type='application/json')
         self.assertEqual(response.content_type, 'application/json')
@@ -111,7 +113,7 @@ class FlaskTestCase(unittest.TestCase):
     def test_all_book_status(self):
         tester = app.test_client(self)
         response = tester.get('/book?id=2')
-        self.assertEqual(response.content_type, 'application/json')
+        self.assertEqual(response.content_type, 'text/html; charset=utf-8')
 
     #Ensure that we can retrive all books     
     def test_all_books(self):
