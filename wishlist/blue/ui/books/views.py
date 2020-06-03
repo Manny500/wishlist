@@ -157,9 +157,11 @@ def details(id):
 
     json_string = response.json()
 
-    if len(json_string) > 0:
+    if len(json_string) > 0 and ('error' not in json_string):
+        my_logger.debug('Book was found', json_string)
         return render_template('details.html', book=json_string)
     else:
+        my_logger.debug('No book found in json')
         msg = 'No Book found'
         return render_template('details.html', msg=msg)
 

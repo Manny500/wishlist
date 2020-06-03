@@ -1,22 +1,24 @@
 {% extends 'layout.html'%}
 
 {% block body %}
-<table class="table table-striped">
-    <thead>
-      <tr>
-        <th scope="col">ISBN</th>
-        <th scope="col">Title</th>
-        <th scope="col">Author</th>
-        <th scope="col">Date</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>{{book.isbn}}</td>
-        <td>{{book.title}}</td>
-        <td>{{book.author}}</td>
-        <td>{{book.date}}</td>
-      </tr>
-    </tbody>
-  </table>
+  {% if book %}
+    <table class="table table-striped">
+        <thead>
+          <tr>
+            <th scope="col">ISBN</th>
+            <th scope="col">Title</th>
+            <th scope="col">Author</th>
+            <th scope="col">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{book.isbn}}</td>
+            <td>{{book.title}}</td>
+            <td>{{book.author}}</td>
+            <td>{{book.date}}</td>
+          </tr>
+        </tbody>
+      </table>
+  {% endif %}
 {% endblock%}
